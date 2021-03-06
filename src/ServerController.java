@@ -1,13 +1,16 @@
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.rmi.Naming;
 import java.util.ArrayList;
+import java.util.Scanner;
+import java.util.stream.Collectors;
 
 public class ServerController {
-    public ArrayList<Candidate> readCandidatesFile() throws IOException {
+    public ArrayList<Candidate> readCandidatesFile(String pathname) throws IOException {
         var candidates = new ArrayList<Candidate>();
-        var path = Paths.get("/Users/lucas/dev/University/election-java-rmi-lucasalgus/senadores.csv");
+        var path = Paths.get(pathname);
 
         Files.lines(path).skip(1).forEach(line -> {
             if (line.length() > 0) {
@@ -21,15 +24,44 @@ public class ServerController {
         return candidates;
     }
 
+    public void readVotesToCandidates(ArrayList<Candidate> candidates) throws IOException {
+
+        try {
+            var path = Paths.get("votes.csv");
+
+            Files.lines(path).forEach(line -> {
+                var voteString = line.split(";");
+
+                if (voteString.length == 0) {
+                    return;
+                }
+
+                var candidate = candidates.stream().filter(c -> {
+                    return c.getNumber() == Integer.parseInt(voteString[0]);
+                }).collect(Collectors.toList()).get(0);
+
+                candidate.getVotes().add(voteString[1]);
+            });
+        } catch (IOException e) {
+            File file = new File("votes.csv");
+            file.createNewFile();
+        }
+    }
+
     public void initialize() {
         try {
-            var candidates = readCandidatesFile();
+            Scanner sc = new Scanner(System.in);
+            String senatorsPathname;
+
+            System.out.println("Digite o caminho do CSV de senadores:");
+            senatorsPathname = sc.nextLine();
+
+            var candidates = readCandidatesFile(senatorsPathname);
+
+            readVotesToCandidates(candidates);
+
             var election = new ElectionServant(candidates);
 
-            // System.setProperty("java.rmi.server.hostname", "localhost");
-            // System.setProperty("java.security.policy", "rmi.policy");
-			// System.setProperty("java.rmi.server.useCodebaseOnly", "false");
-			// System.setProperty("java.rmi.server.codebase", "/Users/lucas/dev/University/election-java-rmi-lucasalgus/bin/Main.class");
             Naming.rebind("rmi://localhost/ElectionService", election);
 
             System.out.println("Servidor em execução");

@@ -1,7 +1,12 @@
 import java.math.BigInteger;
+import java.net.ConnectException;
 import java.rmi.Naming;
+import java.rmi.RemoteException;
 import java.security.MessageDigest;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ClientController {
     private Scanner scanner;
@@ -10,7 +15,7 @@ public class ClientController {
     private String token;
 
     private void log(String message) {
-        System.out.print(message);
+        System.out.println(message);
     }
 
     private void br() {
@@ -32,9 +37,34 @@ public class ClientController {
         try {
             election.vote(token, candidate);
             log("Voto registrado com sucesso!");
-        } catch (Exception e) {
-            log("Erro ao registrar o voto: ");
-            log(e.getMessage());
+        } catch (RemoteException e) {
+            var t = new Timer();
+
+             t.scheduleAtFixedRate(new TimerTask(){
+                int tries = 0;
+                boolean success = false;
+
+                @Override
+                public void run(){
+                    try {
+                        if (success) {
+                            log("Voto registrado com sucesso!");
+                            t.cancel();
+                        }
+                        if (tries >= 30) {
+                            log("Erro ao registrar o voto.");
+                            t.cancel();
+                        }
+                        log("Tentando... " + tries + "/30");
+                        tries++;
+                        initServer();
+                        election.vote(token, candidate);
+                        success = true;
+                    } catch (Exception ex) {
+                        //
+                    }
+                }
+            },0,1000);
         }
     }
 
@@ -49,8 +79,9 @@ public class ClientController {
     }
 
     private void interpretCommand(String line) {
+        String candidate = "";
         try {
-            var candidate = line.split(" ")[1];
+            candidate = line.split(" ")[1];
 
             if (line.contains("vote")) {
                 vote(candidate);
@@ -59,16 +90,21 @@ public class ClientController {
             } else {
                 throw new Exception();
             }
-        } catch(Exception e) {
+        }  catch(Exception e) {
             log("Comando inválido");
+			log(e.getMessage());
         }
+    }
+
+    public void initServer() throws Exception {
+        System.setProperty("java.rmi.server.hostname", "localhost");
+        System.setProperty("java.security.policy", "rmi.policy");
+        election = (Election) Naming.lookup("rmi://localhost/ElectionService");
     }
 
     public void initialize() throws Exception {
         scanner = new Scanner(System.in);
-        System.setProperty("java.rmi.server.hostname", "localhost");
-        System.setProperty("java.security.policy", "rmi.policy");
-        election = (Election) Naming.lookup("rmi://localhost/ElectionService");
+        initServer();
 
         log("Digite o seu nome");
         name = scanner.nextLine();
@@ -88,9 +124,7 @@ public class ClientController {
         log("- `result <numero>` (Exemplo: result 10) ");
         br();
 
-        while (true) {
-            var line = scanner.nextLine();
-            interpretCommand(line);
-        }
+		var line = scanner.nextLine();
+		interpretCommand(line);
     }
 }

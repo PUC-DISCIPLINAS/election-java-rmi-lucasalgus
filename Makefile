@@ -9,4 +9,4 @@ run-server:
 compile:
 	rm -rf bin
 	mkdir bin
-	cd src && javac *.java && mv -f *.class ../bin
+	cd src && /Library/Java/JavaVirtualMachines/jdk-14.0.2.jdk/Contents/Home/bin/javac *.java && mv -f *.class ../bin
