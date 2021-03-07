@@ -17,7 +17,7 @@ public class ElectionServant extends UnicastRemoteObject implements Election {
 
     public void writeVoteToFile(String candidate, String voter) {
         try {
-            FileWriter file = new FileWriter("votes.csv");
+            FileWriter file = new FileWriter("votes.csv", true);
             file.write(candidate + ";" + voter);
             file.close();
         } catch(Exception e) {
